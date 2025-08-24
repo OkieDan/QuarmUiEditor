@@ -9,7 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LayoutEditor.Tests", "src\L
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LayoutEditor.ConsoleApp", "src\LayoutEditor.ConsoleApp\LayoutEditor.ConsoleApp.csproj", "{3A4E4D94-DB29-CCA0-71A2-63F143C67435}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LayoutEditor.Winforms", "src\LayoutEditor.WinForms\LayoutEditor.Winforms.csproj", "{47E0A992-99C3-7532-31B6-E369945B0E88}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LayoutEditor.WinForms", "src\LayoutEditor.WinForms\LayoutEditor.WinForms.csproj", "{47E0A992-99C3-7532-31B6-E369945B0E88}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

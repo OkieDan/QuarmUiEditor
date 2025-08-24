@@ -3,18 +3,24 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using System.Configuration;
+using System.Linq;
 using LayoutEditor.Common;
-using LayoutEditor.Common.Windows; // Added missing using directive
+using LayoutEditor.Common.Windows;
 using LayoutEditor.WinForms.Controls;
+using LayoutEditor.WinForms;
 
 namespace LayoutEditor.WinForms
 {
     public partial class MainForm : Form
     {
-        private CharacterUiProfile? _profile; // Made nullable
-        private UiViewport? _viewport; // Made nullable
-        private ToolStripStatusLabel? _statusLabel; // Made nullable
-        private PropertyGrid? _propertyGrid; // Made nullable
+        private CharacterUiProfile? _profile;
+        private UiViewport? _viewport;
+        private ToolStripStatusLabel? _statusLabel;
+        private PropertyGrid? _propertyGrid;
+        private readonly List<string> _recentFiles = new();
+        private readonly int _maxRecentFiles = 10;
+        private ToolStripMenuItem? _recentFilesMenuItem;
         private readonly Dictionary<string, Size> _commonResolutions = new()
         {
             { "HD (1280x720)", new Size(1280, 720) },
@@ -30,6 +36,7 @@ namespace LayoutEditor.WinForms
         public MainForm()
         {
             InitializeComponent();
+            LoadRecentFiles();
             ConfigureUI();
         }
 
@@ -49,6 +56,13 @@ namespace LayoutEditor.WinForms
             fileMenu.DropDownItems.Add(new ToolStripMenuItem("&Open...", null, OpenProfile_Click, Keys.Control | Keys.O));
             fileMenu.DropDownItems.Add(new ToolStripMenuItem("&Save", null, SaveProfile_Click, Keys.Control | Keys.S));
             fileMenu.DropDownItems.Add(new ToolStripMenuItem("Save &As...", null, SaveProfileAs_Click));
+            fileMenu.DropDownItems.Add(new ToolStripSeparator());
+            
+            // Recent files menu item
+            _recentFilesMenuItem = new ToolStripMenuItem("Recent &Files");
+            UpdateRecentFilesMenu();
+            fileMenu.DropDownItems.Add(_recentFilesMenuItem);
+            
             fileMenu.DropDownItems.Add(new ToolStripSeparator());
             fileMenu.DropDownItems.Add(new ToolStripMenuItem("E&xit", null, (s, e) => Close(), Keys.Alt | Keys.F4));
             
@@ -172,8 +186,150 @@ namespace LayoutEditor.WinForms
                 _viewport?.Invalidate();
             };
         }
+        
+        #region Recent Files Management
+        
+        private void LoadRecentFiles()
+        {
+            _recentFiles.Clear();
+            
+            try
+            {
+                var settings = Properties.Settings.Default;
+                var recentFilesCollection = settings.RecentFiles;
+                
+                // If we have saved recent files, add them to our list
+                if (recentFilesCollection != null)
+                {
+                    foreach (string filePath in recentFilesCollection)
+                    {
+                        if (!string.IsNullOrEmpty(filePath))
+                        {
+                            _recentFiles.Add(filePath);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // If loading fails, log the error but continue with an empty list
+                System.Diagnostics.Debug.WriteLine($"Failed to load recent files: {ex.Message}");
+            }
+        }
+        
+        private void SaveRecentFiles()
+        {
+            try
+            {
+                var settings = Properties.Settings.Default;
+                
+                // Create a new StringCollection to hold our recent files
+                var recentFilesCollection = new System.Collections.Specialized.StringCollection();
+                
+                // Add all recent files to the collection
+                foreach (var filePath in _recentFiles)
+                {
+                    recentFilesCollection.Add(filePath);
+                }
+                
+                // Save to settings
+                settings.RecentFiles = recentFilesCollection;
+                settings.Save();
+            }
+            catch (Exception ex)
+            {
+                // If saving fails, log the error but continue
+                System.Diagnostics.Debug.WriteLine($"Failed to save recent files: {ex.Message}");
+            }
+        }
+        
+        private void AddToRecentFiles(string filePath)
+        {
+            // Remove file if it already exists in the list
+            _recentFiles.Remove(filePath);
+            
+            // Add file at the beginning of the list
+            _recentFiles.Insert(0, filePath);
+            
+            // Keep only the most recent files
+            while (_recentFiles.Count > _maxRecentFiles)
+            {
+                _recentFiles.RemoveAt(_recentFiles.Count - 1);
+            }
+            
+            // Update menu and save
+            UpdateRecentFilesMenu();
+            SaveRecentFiles();
+        }
+        
+        private void UpdateRecentFilesMenu()
+        {
+            if (_recentFilesMenuItem == null)
+                return;
+                
+            _recentFilesMenuItem.DropDownItems.Clear();
+            
+            if (_recentFiles.Count == 0)
+            {
+                var noRecentItem = new ToolStripMenuItem("No recent files")
+                {
+                    Enabled = false
+                };
+                _recentFilesMenuItem.DropDownItems.Add(noRecentItem);
+                return;
+            }
+            
+            // Add each file
+            for (int i = 0; i < _recentFiles.Count; i++)
+            {
+                string filePath = _recentFiles[i];
+                string displayText = $"{i+1}. {Path.GetFileName(filePath)}";
+                
+                var menuItem = new ToolStripMenuItem(displayText)
+                {
+                    ToolTipText = filePath,
+                    Tag = filePath
+                };
+                menuItem.Click += RecentFile_Click;
+                _recentFilesMenuItem.DropDownItems.Add(menuItem);
+            }
+            
+            _recentFilesMenuItem.DropDownItems.Add(new ToolStripSeparator());
+            _recentFilesMenuItem.DropDownItems.Add(new ToolStripMenuItem("Clear Recent Files", null, ClearRecentFiles_Click));
+        }
+        
+        private void RecentFile_Click(object? sender, EventArgs e)
+        {
+            if (sender is not ToolStripMenuItem menuItem || menuItem.Tag is not string filePath)
+                return;
+                
+            if (File.Exists(filePath))
+            {
+                OpenProfileFile(filePath);
+            }
+            else
+            {
+                _recentFiles.Remove(filePath);
+                UpdateRecentFilesMenu();
+                SaveRecentFiles();
+                
+                MessageBox.Show(
+                    $"The file '{Path.GetFileName(filePath)}' no longer exists and has been removed from the recent files list.",
+                    "File Not Found",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+        }
+        
+        private void ClearRecentFiles_Click(object? sender, EventArgs e)
+        {
+            _recentFiles.Clear();
+            UpdateRecentFilesMenu();
+            SaveRecentFiles();
+        }
+        
+        #endregion
 
-        // Fixed signature to match EventHandler<UiWindowBase?>
         private void Viewport_SelectionChanged(object? sender, UiWindowBase? window)
         {
             if (_propertyGrid != null)
@@ -189,7 +345,6 @@ namespace LayoutEditor.WinForms
             }
         }
 
-        // Fixed signature for nullability
         private void OpenProfile_Click(object? sender, EventArgs e)
         {
             using var openFileDialog = new OpenFileDialog
@@ -200,31 +355,38 @@ namespace LayoutEditor.WinForms
             
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                try
+                OpenProfileFile(openFileDialog.FileName);
+            }
+        }
+        
+        private void OpenProfileFile(string filePath)
+        {
+            try
+            {
+                Cursor = Cursors.WaitCursor;
+                _profile = CharacterUiProfile.LoadFromFile(filePath);
+                
+                if (_viewport != null)
                 {
-                    Cursor = Cursors.WaitCursor;
-                    _profile = CharacterUiProfile.LoadFromFile(openFileDialog.FileName);
-                    
-                    if (_viewport != null)
-                    {
-                        _viewport.Profile = _profile;
-                    }
-                    
-                    Text = $"Quarm Character UI Profile Editor - {Path.GetFileName(openFileDialog.FileName)}";
+                    _viewport.Profile = _profile;
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error loading profile: {ex.Message}", "Error", 
-                                   MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-                finally
-                {
-                    Cursor = Cursors.Default;
-                }
+                
+                Text = $"Quarm Character UI Profile Editor - {Path.GetFileName(filePath)}";
+                
+                // Add to recent files list
+                AddToRecentFiles(filePath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading profile: {ex.Message}", "Error", 
+                               MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                Cursor = Cursors.Default;
             }
         }
 
-        // Fixed signature for nullability
         private void SaveProfile_Click(object? sender, EventArgs e)
         {
             if (_profile == null)
@@ -238,7 +400,6 @@ namespace LayoutEditor.WinForms
             SaveProfileAs_Click(sender, e);
         }
 
-        // Fixed signature for nullability
         private void SaveProfileAs_Click(object? sender, EventArgs e)
         {
             if (_profile == null)
@@ -262,6 +423,9 @@ namespace LayoutEditor.WinForms
                     Cursor = Cursors.WaitCursor;
                     _profile.SaveToFile(saveFileDialog.FileName);
                     Text = $"Quarm Character UI Profile Editor - {Path.GetFileName(saveFileDialog.FileName)}";
+                    
+                    // Add to recent files list
+                    AddToRecentFiles(saveFileDialog.FileName);
                 }
                 catch (Exception ex)
                 {
@@ -275,7 +439,6 @@ namespace LayoutEditor.WinForms
             }
         }
 
-        // Fixed signature for nullability
         private void ResolutionDropdown_SelectedIndexChanged(object? sender, EventArgs e)
         {
             var dropdown = sender as ToolStripComboBox;
@@ -287,7 +450,6 @@ namespace LayoutEditor.WinForms
             }
         }
 
-        // Fixed signature for nullability
         private void MaintainAspectRatio_Click(object? sender, EventArgs e)
         {
             if (sender is ToolStripMenuItem menuItem && _viewport != null)
