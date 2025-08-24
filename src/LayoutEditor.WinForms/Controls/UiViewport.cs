@@ -287,7 +287,7 @@ namespace LayoutEditor.WinForms.Controls
                 }
             }
             
-            // Store the previous selection to detect changes
+            // Store previous selection to compare
             var previousSelection = _selectedWindow;
             
             // Check for window selection
@@ -306,7 +306,7 @@ namespace LayoutEditor.WinForms.Controls
                 
                 if (scaledRect.Contains(e.Location))
                 {
-                    if (_profile.TryGetWindow<StandardWindow>(kvp.Key, out var window))
+                    if (_profile?.TryGetWindow<StandardWindow>(kvp.Key, out var window) == true)
                     {
                         _selectedWindow = window;
                         _isDragging = true;
@@ -316,7 +316,7 @@ namespace LayoutEditor.WinForms.Controls
                 }
             }
             
-            // If selection changed, raise the event
+            // Raise SelectionChanged event if selection has changed
             if (_selectedWindow != previousSelection)
             {
                 SelectionChanged?.Invoke(this, _selectedWindow);

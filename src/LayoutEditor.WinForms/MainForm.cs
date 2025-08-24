@@ -113,19 +113,20 @@ namespace LayoutEditor.WinForms
             statusBar.Items.Add(_statusLabel);
             Controls.Add(statusBar);
             
-            // Splitter container for viewport and property panel
+            // Splitter container for viewport and property panel - CHANGED TO VERTICAL
             var splitter = new SplitContainer
             {
                 Dock = DockStyle.Fill,
-                Orientation = Orientation.Horizontal,
-                SplitterDistance = 700
+                Orientation = Orientation.Vertical, // Changed from Horizontal to Vertical
+                SplitterDistance = ClientSize.Width - 300 // Give properties panel ~300px width
             };
             
             // Create and add the viewport
             _viewport = new UiViewport
             {
                 Dock = DockStyle.Fill,
-                MaintainAspectRatio = true
+                MaintainAspectRatio = true,
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
             };
             
             splitter.Panel1.Controls.Add(_viewport);
@@ -148,6 +149,12 @@ namespace LayoutEditor.WinForms
             propertyPanel.Controls.Add(_propertyGrid);
             splitter.Panel2.Controls.Add(propertyPanel);
             
+            // Make splitter distance responsive to form size
+            splitter.SplitterMoved += (s, e) => {
+                // Ensure viewport gets updated when splitter moves
+                _viewport?.Invalidate();
+            };
+            
             Controls.Add(splitter);
             
             // Set initial resolution
@@ -159,6 +166,11 @@ namespace LayoutEditor.WinForms
             
             // Add event handler for window selection change
             _viewport.SelectionChanged += Viewport_SelectionChanged;
+            
+            // Make sure viewport is visible after resizing
+            this.Resize += (s, e) => {
+                _viewport?.Invalidate();
+            };
         }
 
         // Fixed signature to match EventHandler<UiWindowBase?>
