@@ -40,7 +40,6 @@ namespace LayoutEditor.WinForms.Controls
             set
             {
                 _targetResolution = value;
-                RecalculateScaleFactor();
                 RecalculateWindowRectangles();
                 Invalidate();
             }
@@ -52,7 +51,6 @@ namespace LayoutEditor.WinForms.Controls
             set
             {
                 _maintainAspectRatio = value;
-                RecalculateScaleFactor();
                 RecalculateWindowRectangles();
                 Invalidate();
             }
@@ -79,23 +77,8 @@ namespace LayoutEditor.WinForms.Controls
         
         private void UiViewport_Resize(object sender, EventArgs e)
         {
-            RecalculateScaleFactor();
             RecalculateWindowRectangles();
             Invalidate();
-        }
-        
-        private void RecalculateScaleFactor()
-        {
-            if (_maintainAspectRatio)
-            {
-                float scaleX = (float)Width / _targetResolution.Width;
-                float scaleY = (float)Height / _targetResolution.Height;
-                _scaleFactor = Math.Min(scaleX, scaleY);
-            }
-            else
-            {
-                _scaleFactor = 1.0f;
-            }
         }
         
         private void RecalculateWindowRectangles()
@@ -129,19 +112,77 @@ namespace LayoutEditor.WinForms.Controls
                 }
             }
         }
-        
+
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
             
+            if (_profile == null)
+                return;
+                
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             
-            // Calculate viewport rectangle
-            int viewportWidth = (int)(_targetResolution.Width * _scaleFactor);
-            int viewportHeight = (int)(_targetResolution.Height * _scaleFactor);
-            int offsetX = (Width - viewportWidth) / 2;
-            int offsetY = (Height - viewportHeight) / 2;
+            // Calculate the maximum viewport size that fits within the control
+            int availableWidth = ClientSize.Width;
+            int availableHeight = ClientSize.Height;
+            
+            // Safety check - ensure we have some space to work with
+            if (availableWidth <= 10 || availableHeight <= 10)
+                return;
+            
+            float targetAspectRatio = (float)_targetResolution.Width / _targetResolution.Height;
+            
+            // Calculate viewport size while maintaining aspect ratio
+            int viewportWidth, viewportHeight;
+            
+            if (_maintainAspectRatio)
+            {
+                // Use the available space efficiently while keeping aspect ratio
+                if (availableWidth / targetAspectRatio <= availableHeight)
+                {
+                    // Width constrained
+                    viewportWidth = availableWidth;
+                    viewportHeight = (int)(availableWidth / targetAspectRatio);
+                }
+                else
+                {
+                    // Height constrained
+                    viewportHeight = availableHeight;
+                    viewportWidth = (int)(availableHeight * targetAspectRatio);
+                }
+                
+                //// Apply a small reduction to ensure there's a margin
+                //viewportWidth = (int)(viewportWidth * 0.95);
+                //viewportHeight = (int)(viewportHeight * 0.95);
+            }
+            else
+            {
+                // Use most of the available space but leave a margin
+                //viewportWidth = (int)(availableWidth * 0.95);
+                //viewportHeight = (int)(availableHeight * 0.95);
+                viewportWidth = availableWidth;
+                viewportHeight = availableHeight;
+            }
+
+            // Calculate scale factor (consistent in both dimensions)
+            _scaleFactor = Math.Min((float)viewportWidth / _targetResolution.Width, 
+                                  (float)viewportHeight / _targetResolution.Height);
+            
+            // Ensure scale factor is reasonable
+            if (_scaleFactor <= 0.01f)
+                _scaleFactor = 0.01f;
+            
+            // Center the viewport in the available space
+            int offsetX = (availableWidth - viewportWidth) / 2;
+            int offsetY = (availableHeight - viewportHeight) / 2;
+            
+            // Remove this line that added extra margin at the top
+            // offsetY += 10;
+            
+            // Ensure offsets are non-negative
+            offsetX = Math.Max(0, offsetX);
+            offsetY = Math.Max(0, offsetY);
             
             // Draw viewport background
             using (var brush = new SolidBrush(Color.FromArgb(30, 30, 30)))
@@ -156,61 +197,73 @@ namespace LayoutEditor.WinForms.Controls
                 for (int y = 0; y <= _targetResolution.Height; y += 100)
                 {
                     int scaledY = offsetY + (int)(y * _scaleFactor);
-                    g.DrawLine(pen, offsetX, scaledY, offsetX + viewportWidth, scaledY);
+                    if (scaledY >= offsetY && scaledY <= offsetY + viewportHeight)
+                        g.DrawLine(pen, offsetX, scaledY, offsetX + viewportWidth, scaledY);
                 }
                 
                 // Draw vertical lines
                 for (int x = 0; x <= _targetResolution.Width; x += 100)
                 {
                     int scaledX = offsetX + (int)(x * _scaleFactor);
-                    g.DrawLine(pen, scaledX, offsetY, scaledX, offsetY + viewportHeight);
+                    if (scaledX >= offsetX && scaledX <= offsetX + viewportWidth)
+                        g.DrawLine(pen, scaledX, offsetY, scaledX, offsetY + viewportHeight);
                 }
             }
             
             // Draw UI windows
-            if (_profile != null)
+            foreach (var kvp in _windowRectangles)
             {
-                foreach (var kvp in _windowRectangles)
+                string windowName = kvp.Key;
+                Rectangle rect = kvp.Value;
+                
+                // Scale and offset the rectangle
+                Rectangle scaledRect = new Rectangle(
+                    offsetX + (int)(rect.X * _scaleFactor),
+                    offsetY + (int)(rect.Y * _scaleFactor),
+                    Math.Max(1, (int)(rect.Width * _scaleFactor)),
+                    Math.Max(1, (int)(rect.Height * _scaleFactor))
+                );
+                
+                bool isSelected = _selectedWindow != null && _selectedWindow.Name == windowName;
+                
+                // Draw window rectangle
+                using (var brush = new SolidBrush(isSelected ? Color.FromArgb(100, 100, 200, 100) : Color.FromArgb(80, 100, 100, 100)))
                 {
-                    string windowName = kvp.Key;
-                    Rectangle rect = kvp.Value;
-                    
-                    // Scale and offset the rectangle
-                    Rectangle scaledRect = new Rectangle(
-                        offsetX + (int)(rect.X * _scaleFactor),
-                        offsetY + (int)(rect.Y * _scaleFactor),
-                        (int)(rect.Width * _scaleFactor),
-                        (int)(rect.Height * _scaleFactor)
-                    );
-                    
-                    bool isSelected = _selectedWindow != null && _selectedWindow.Name == windowName;
-                    
-                    // Draw window rectangle
-                    using (var brush = new SolidBrush(isSelected ? Color.FromArgb(100, 100, 200, 100) : Color.FromArgb(80, 100, 100, 100)))
-                    {
-                        g.FillRectangle(brush, scaledRect);
-                    }
-                    
-                    // Draw window border
-                    using (var pen = new Pen(isSelected ? Color.LimeGreen : Color.Gray))
-                    {
-                        g.DrawRectangle(pen, scaledRect);
-                    }
-                    
-                    // Draw window title
+                    g.FillRectangle(brush, scaledRect);
+                }
+                
+                // Draw window border
+                using (var pen = new Pen(isSelected ? Color.LimeGreen : Color.Gray))
+                {
+                    g.DrawRectangle(pen, scaledRect);
+                }
+                
+                // Draw window title if there's enough space
+                if (scaledRect.Width > 20 && scaledRect.Height > 10)
+                {
                     using (var brush = new SolidBrush(Color.White))
                     using (var font = new Font("Segoe UI", 8f))
                     {
-                        g.DrawString(windowName, font, brush, 
+                        // Measure text to see if it fits
+                        string displayText = windowName;
+                        SizeF textSize = g.MeasureString(displayText, font);
+                        
+                        // If text is too wide, truncate it
+                        if (textSize.Width > scaledRect.Width - 6)
+                        {
+                            displayText = windowName.Substring(0, Math.Max(1, windowName.Length * scaledRect.Width / (int)textSize.Width - 3)) + "...";
+                        }
+                        
+                        g.DrawString(displayText, font, brush, 
                                     scaledRect.X + 3, 
                                     scaledRect.Y + 3);
                     }
-                    
-                    // Draw resize handles if selected
-                    if (isSelected)
-                    {
-                        DrawResizeHandles(g, scaledRect);
-                    }
+                }
+                
+                // Draw resize handles if selected
+                if (isSelected)
+                {
+                    DrawResizeHandles(g, scaledRect);
                 }
             }
             
@@ -219,7 +272,7 @@ namespace LayoutEditor.WinForms.Controls
             using (var font = new Font("Segoe UI", 9f))
             {
                 string resInfo = $"Resolution: {_targetResolution.Width}x{_targetResolution.Height} - Scale: {_scaleFactor:F2}x";
-                g.DrawString(resInfo, font, brush, 10, Height - 25);
+                g.DrawString(resInfo, font, brush, 10, ClientSize.Height - 25);
             }
         }
         
@@ -268,13 +321,45 @@ namespace LayoutEditor.WinForms.Controls
         {
             _dragStartPoint = e.Location;
             
-            // Calculate viewport offset
-            int viewportWidth = (int)(_targetResolution.Width * _scaleFactor);
-            int viewportHeight = (int)(_targetResolution.Height * _scaleFactor);
-            int offsetX = (Width - viewportWidth) / 2;
-            int offsetY = (Height - viewportHeight) / 2;
+            // Calculate viewport dimensions using same logic as in OnPaint
+            int availableWidth = ClientSize.Width;
+            int availableHeight = ClientSize.Height;
+            float targetAspectRatio = (float)_targetResolution.Width / _targetResolution.Height;
+            int viewportWidth, viewportHeight;
             
-            // Check for resize handle
+            if (_maintainAspectRatio)
+            {
+                if (availableWidth / targetAspectRatio <= availableHeight)
+                {
+                    viewportWidth = availableWidth;
+                    viewportHeight = (int)(availableWidth / targetAspectRatio);
+                }
+                else
+                {
+                    viewportHeight = availableHeight;
+                    viewportWidth = (int)(availableHeight * targetAspectRatio);
+                }
+            }
+            else
+            {
+                viewportWidth = availableWidth;
+                viewportHeight = availableHeight;
+            }
+            
+            _scaleFactor = Math.Min((float)viewportWidth / _targetResolution.Width, 
+                                  (float)viewportHeight / _targetResolution.Height);
+            
+            int offsetX = (availableWidth - viewportWidth) / 2;
+            int offsetY = (availableHeight - viewportHeight) / 2;
+            
+            // Ensure offsets are non-negative
+            offsetX = Math.Max(0, offsetX);
+            offsetY = Math.Max(0, offsetY);
+            
+            // Save previous selection
+            var previousSelection = _selectedWindow;
+            
+            // Check for resize handle first
             if (_selectedWindow != null)
             {
                 Rectangle scaledRect = GetScaledRectangle(_selectedWindow.Name, offsetX, offsetY);
@@ -287,9 +372,6 @@ namespace LayoutEditor.WinForms.Controls
                 }
             }
             
-            // Store previous selection to compare
-            var previousSelection = _selectedWindow;
-            
             // Check for window selection
             _selectedWindow = null;
             foreach (var kvp in _windowRectangles)
@@ -300,8 +382,8 @@ namespace LayoutEditor.WinForms.Controls
                 Rectangle scaledRect = new Rectangle(
                     offsetX + (int)(rect.X * _scaleFactor),
                     offsetY + (int)(rect.Y * _scaleFactor),
-                    (int)(rect.Width * _scaleFactor),
-                    (int)(rect.Height * _scaleFactor)
+                    Math.Max(1, (int)(rect.Width * _scaleFactor)),
+                    Math.Max(1, (int)(rect.Height * _scaleFactor))
                 );
                 
                 if (scaledRect.Contains(e.Location))
@@ -316,7 +398,7 @@ namespace LayoutEditor.WinForms.Controls
                 }
             }
             
-            // Raise SelectionChanged event if selection has changed
+            // Raise event if selection changed
             if (_selectedWindow != previousSelection)
             {
                 SelectionChanged?.Invoke(this, _selectedWindow);
@@ -448,8 +530,8 @@ namespace LayoutEditor.WinForms.Controls
             return new Rectangle(
                 offsetX + (int)(rect.X * _scaleFactor),
                 offsetY + (int)(rect.Y * _scaleFactor),
-                (int)(rect.Width * _scaleFactor),
-                (int)(rect.Height * _scaleFactor)
+                Math.Max(1, (int)(rect.Width * _scaleFactor)),
+                Math.Max(1, (int)(rect.Height * _scaleFactor))
             );
         }
         

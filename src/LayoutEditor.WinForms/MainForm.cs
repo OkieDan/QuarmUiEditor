@@ -14,13 +14,10 @@ namespace LayoutEditor.WinForms
 {
     public partial class MainForm : Form
     {
+        // Keep only business logic fields in MainForm.cs, not UI controls
         private CharacterUiProfile? _profile;
-        private UiViewport? _viewport;
-        private ToolStripStatusLabel? _statusLabel;
-        private PropertyGrid? _propertyGrid;
         private readonly List<string> _recentFiles = new();
         private readonly int _maxRecentFiles = 10;
-        private ToolStripMenuItem? _recentFilesMenuItem;
         private readonly Dictionary<string, Size> _commonResolutions = new()
         {
             { "HD (1280x720)", new Size(1280, 720) },
@@ -36,168 +33,50 @@ namespace LayoutEditor.WinForms
         public MainForm()
         {
             InitializeComponent();
+
+            // Setup everything after the InitializeComponent call
+            SetupEventHandlers();
+            PopulateResolutions();
             LoadRecentFiles();
-            ConfigureUI();
+            UpdateRecentFilesMenu();
+            propertyPanel.Controls.Add(_propertyGrid);
+            contentPanel.Controls.Add(MainSplitter);
+
+            // Add Load event handler to handle layout after form is fully initialized
+            this.Load += MainForm_Load;
         }
 
-        private void ConfigureUI()
+        private void SetupEventHandlers()
         {
-            // Set form properties
-            Text = "Quarm Character UI Profile Editor";
-            MinimumSize = new Size(800, 600);
-            
-            // Menu
-            var mainMenu = new MenuStrip
-            {
-                Dock = DockStyle.Top
-            };
-            
-            var fileMenu = new ToolStripMenuItem("&File");
-            fileMenu.DropDownItems.Add(new ToolStripMenuItem("&Open...", null, OpenProfile_Click, Keys.Control | Keys.O));
-            fileMenu.DropDownItems.Add(new ToolStripMenuItem("&Save", null, SaveProfile_Click, Keys.Control | Keys.S));
-            fileMenu.DropDownItems.Add(new ToolStripMenuItem("Save &As...", null, SaveProfileAs_Click));
-            fileMenu.DropDownItems.Add(new ToolStripSeparator());
-            
-            // Recent files menu item
-            _recentFilesMenuItem = new ToolStripMenuItem("Recent &Files");
-            UpdateRecentFilesMenu();
-            fileMenu.DropDownItems.Add(_recentFilesMenuItem);
-            
-            fileMenu.DropDownItems.Add(new ToolStripSeparator());
-            fileMenu.DropDownItems.Add(new ToolStripMenuItem("E&xit", null, (s, e) => Close(), Keys.Alt | Keys.F4));
-            
-            var viewMenu = new ToolStripMenuItem("&View");
-            viewMenu.DropDownItems.Add(new ToolStripMenuItem("&Maintain Aspect Ratio", null, MaintainAspectRatio_Click) { Checked = true, CheckOnClick = true });
-            
-            var helpMenu = new ToolStripMenuItem("&Help");
-            helpMenu.DropDownItems.Add(new ToolStripMenuItem("&About", null, (s, e) => MessageBox.Show(
-                "Quarm Character UI Profile Editor\n\nA tool for editing EQ UI layouts", 
-                "About", MessageBoxButtons.OK, MessageBoxIcon.Information)));
-            
-            mainMenu.Items.Add(fileMenu);
-            mainMenu.Items.Add(viewMenu);
-            mainMenu.Items.Add(helpMenu);
-            
-            Controls.Add(mainMenu);
-            MainMenuStrip = mainMenu;
-            
-            // Toolbar
-            var toolbar = new ToolStrip
-            {
-                Dock = DockStyle.Top,
-                GripStyle = ToolStripGripStyle.Hidden,
-                RenderMode = ToolStripRenderMode.System
-            };
-            
-            // Resolution label
-            toolbar.Items.Add(new ToolStripLabel("Resolution:"));
-            
-            // Resolution dropdown
-            var resolutionDropdown = new ToolStripComboBox("ResolutionSelector")
-            {
-                Width = 180,
-                DropDownStyle = ComboBoxStyle.DropDownList
-            };
-            
+        }
+
+        private void PopulateResolutions()
+        {
             foreach (var resolution in _commonResolutions)
             {
                 resolutionDropdown.Items.Add(resolution.Key);
             }
-            
+
             // Select WQHD by default
-            resolutionDropdown.SelectedIndex = 2; 
-            resolutionDropdown.SelectedIndexChanged += ResolutionDropdown_SelectedIndexChanged;
-            toolbar.Items.Add(resolutionDropdown);
-            
-            // Spacing
-            toolbar.Items.Add(new ToolStripSeparator());
-            
-            // Window Properties section
-            toolbar.Items.Add(new ToolStripLabel("Window Properties:"));
-            
-            // Add toolbar to form
-            Controls.Add(toolbar);
-            
-            // Status bar
-            var statusBar = new StatusStrip();
-            _statusLabel = new ToolStripStatusLabel
-            {
-                Text = "Ready"
-            };
-            statusBar.Items.Add(_statusLabel);
-            Controls.Add(statusBar);
-            
-            // Splitter container for viewport and property panel - CHANGED TO VERTICAL
-            var splitter = new SplitContainer
-            {
-                Dock = DockStyle.Fill,
-                Orientation = Orientation.Vertical, // Changed from Horizontal to Vertical
-                SplitterDistance = ClientSize.Width - 300 // Give properties panel ~300px width
-            };
-            
-            // Create and add the viewport
-            _viewport = new UiViewport
-            {
-                Dock = DockStyle.Fill,
-                MaintainAspectRatio = true,
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
-            };
-            
-            splitter.Panel1.Controls.Add(_viewport);
-            
-            // Property grid for selected window
-            var propertyPanel = new Panel
-            {
-                Dock = DockStyle.Fill,
-                Padding = new Padding(5)
-            };
-            
-            _propertyGrid = new PropertyGrid
-            {
-                Dock = DockStyle.Fill,
-                PropertySort = PropertySort.Categorized,
-                ToolbarVisible = false,
-                HelpVisible = true
-            };
-            
-            propertyPanel.Controls.Add(_propertyGrid);
-            splitter.Panel2.Controls.Add(propertyPanel);
-            
-            // Make splitter distance responsive to form size
-            splitter.SplitterMoved += (s, e) => {
-                // Ensure viewport gets updated when splitter moves
-                _viewport?.Invalidate();
-            };
-            
-            Controls.Add(splitter);
-            
-            // Set initial resolution
-            if (resolutionDropdown.SelectedItem is string selectedResolution && 
-                _commonResolutions.TryGetValue(selectedResolution, out var size))
-            {
-                _viewport.TargetResolution = size;
-            }
-            
-            // Add event handler for window selection change
-            _viewport.SelectionChanged += Viewport_SelectionChanged;
-            
-            // Make sure viewport is visible after resizing
-            this.Resize += (s, e) => {
-                _viewport?.Invalidate();
-            };
+            resolutionDropdown.SelectedIndex = 2;
         }
-        
+
+        private void MainForm_Load(object sender, EventArgs e)
+        {
+
+        }
+
         #region Recent Files Management
-        
+
         private void LoadRecentFiles()
         {
             _recentFiles.Clear();
-            
+
             try
             {
                 var settings = Properties.Settings.Default;
                 var recentFilesCollection = settings.RecentFiles;
-                
+
                 // If we have saved recent files, add them to our list
                 if (recentFilesCollection != null)
                 {
@@ -216,22 +95,22 @@ namespace LayoutEditor.WinForms
                 System.Diagnostics.Debug.WriteLine($"Failed to load recent files: {ex.Message}");
             }
         }
-        
+
         private void SaveRecentFiles()
         {
             try
             {
                 var settings = Properties.Settings.Default;
-                
+
                 // Create a new StringCollection to hold our recent files
                 var recentFilesCollection = new System.Collections.Specialized.StringCollection();
-                
+
                 // Add all recent files to the collection
                 foreach (var filePath in _recentFiles)
                 {
                     recentFilesCollection.Add(filePath);
                 }
-                
+
                 // Save to settings
                 settings.RecentFiles = recentFilesCollection;
                 settings.Save();
@@ -242,33 +121,33 @@ namespace LayoutEditor.WinForms
                 System.Diagnostics.Debug.WriteLine($"Failed to save recent files: {ex.Message}");
             }
         }
-        
+
         private void AddToRecentFiles(string filePath)
         {
             // Remove file if it already exists in the list
             _recentFiles.Remove(filePath);
-            
+
             // Add file at the beginning of the list
             _recentFiles.Insert(0, filePath);
-            
+
             // Keep only the most recent files
             while (_recentFiles.Count > _maxRecentFiles)
             {
                 _recentFiles.RemoveAt(_recentFiles.Count - 1);
             }
-            
+
             // Update menu and save
             UpdateRecentFilesMenu();
             SaveRecentFiles();
         }
-        
+
         private void UpdateRecentFilesMenu()
         {
             if (_recentFilesMenuItem == null)
                 return;
-                
+
             _recentFilesMenuItem.DropDownItems.Clear();
-            
+
             if (_recentFiles.Count == 0)
             {
                 var noRecentItem = new ToolStripMenuItem("No recent files")
@@ -278,13 +157,13 @@ namespace LayoutEditor.WinForms
                 _recentFilesMenuItem.DropDownItems.Add(noRecentItem);
                 return;
             }
-            
+
             // Add each file
             for (int i = 0; i < _recentFiles.Count; i++)
             {
                 string filePath = _recentFiles[i];
-                string displayText = $"{i+1}. {Path.GetFileName(filePath)}";
-                
+                string displayText = $"{i + 1}. {Path.GetFileName(filePath)}";
+
                 var menuItem = new ToolStripMenuItem(displayText)
                 {
                     ToolTipText = filePath,
@@ -293,16 +172,16 @@ namespace LayoutEditor.WinForms
                 menuItem.Click += RecentFile_Click;
                 _recentFilesMenuItem.DropDownItems.Add(menuItem);
             }
-            
+
             _recentFilesMenuItem.DropDownItems.Add(new ToolStripSeparator());
             _recentFilesMenuItem.DropDownItems.Add(new ToolStripMenuItem("Clear Recent Files", null, ClearRecentFiles_Click));
         }
-        
+
         private void RecentFile_Click(object? sender, EventArgs e)
         {
             if (sender is not ToolStripMenuItem menuItem || menuItem.Tag is not string filePath)
                 return;
-                
+
             if (File.Exists(filePath))
             {
                 OpenProfileFile(filePath);
@@ -312,7 +191,7 @@ namespace LayoutEditor.WinForms
                 _recentFiles.Remove(filePath);
                 UpdateRecentFilesMenu();
                 SaveRecentFiles();
-                
+
                 MessageBox.Show(
                     $"The file '{Path.GetFileName(filePath)}' no longer exists and has been removed from the recent files list.",
                     "File Not Found",
@@ -320,14 +199,14 @@ namespace LayoutEditor.WinForms
                     MessageBoxIcon.Information);
             }
         }
-        
+
         private void ClearRecentFiles_Click(object? sender, EventArgs e)
         {
             _recentFiles.Clear();
             UpdateRecentFilesMenu();
             SaveRecentFiles();
         }
-        
+
         #endregion
 
         private void Viewport_SelectionChanged(object? sender, UiWindowBase? window)
@@ -339,8 +218,8 @@ namespace LayoutEditor.WinForms
 
             if (_statusLabel != null)
             {
-                _statusLabel.Text = window != null 
-                    ? $"Selected: {window.Name}" 
+                _statusLabel.Text = window != null
+                    ? $"Selected: {window.Name}"
                     : "No window selected";
             }
         }
@@ -352,33 +231,33 @@ namespace LayoutEditor.WinForms
                 Filter = "INI Files|*.ini;*.proj.ini|All Files|*.*",
                 Title = "Open EverQuest UI Profile"
             };
-            
+
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
                 OpenProfileFile(openFileDialog.FileName);
             }
         }
-        
+
         private void OpenProfileFile(string filePath)
         {
             try
             {
                 Cursor = Cursors.WaitCursor;
                 _profile = CharacterUiProfile.LoadFromFile(filePath);
-                
-                if (_viewport != null)
+
+                if (UiViewport != null)
                 {
-                    _viewport.Profile = _profile;
+                    UiViewport.Profile = _profile;
                 }
-                
+
                 Text = $"Quarm Character UI Profile Editor - {Path.GetFileName(filePath)}";
-                
+
                 // Add to recent files list
                 AddToRecentFiles(filePath);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading profile: {ex.Message}", "Error", 
+                MessageBox.Show($"Error loading profile: {ex.Message}", "Error",
                                MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
@@ -391,11 +270,11 @@ namespace LayoutEditor.WinForms
         {
             if (_profile == null)
             {
-                MessageBox.Show("No profile is loaded.", "Error", 
+                MessageBox.Show("No profile is loaded.", "Error",
                                MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-            
+
             // For now, we'll just use Save As functionality
             SaveProfileAs_Click(sender, e);
         }
@@ -404,18 +283,18 @@ namespace LayoutEditor.WinForms
         {
             if (_profile == null)
             {
-                MessageBox.Show("No profile is loaded.", "Error", 
+                MessageBox.Show("No profile is loaded.", "Error",
                                MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-            
+
             using var saveFileDialog = new SaveFileDialog
             {
                 Filter = "INI Files|*.ini|Project INI Files|*.proj.ini|All Files|*.*",
                 Title = "Save EverQuest UI Profile",
                 OverwritePrompt = true
             };
-            
+
             if (saveFileDialog.ShowDialog() == DialogResult.OK)
             {
                 try
@@ -423,13 +302,13 @@ namespace LayoutEditor.WinForms
                     Cursor = Cursors.WaitCursor;
                     _profile.SaveToFile(saveFileDialog.FileName);
                     Text = $"Quarm Character UI Profile Editor - {Path.GetFileName(saveFileDialog.FileName)}";
-                    
+
                     // Add to recent files list
                     AddToRecentFiles(saveFileDialog.FileName);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error saving profile: {ex.Message}", "Error", 
+                    MessageBox.Show($"Error saving profile: {ex.Message}", "Error",
                                    MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
                 finally
@@ -442,20 +321,31 @@ namespace LayoutEditor.WinForms
         private void ResolutionDropdown_SelectedIndexChanged(object? sender, EventArgs e)
         {
             var dropdown = sender as ToolStripComboBox;
-            if (dropdown?.SelectedItem is string selectedResolution && 
+            if (dropdown?.SelectedItem is string selectedResolution &&
                 _commonResolutions.TryGetValue(selectedResolution, out var size) &&
-                _viewport != null)
+                UiViewport != null)
             {
-                _viewport.TargetResolution = size;
+                UiViewport.TargetResolution = size;
             }
         }
 
         private void MaintainAspectRatio_Click(object? sender, EventArgs e)
         {
-            if (sender is ToolStripMenuItem menuItem && _viewport != null)
+            if (sender is ToolStripMenuItem menuItem && UiViewport != null)
             {
-                _viewport.MaintainAspectRatio = menuItem.Checked;
+                UiViewport.MaintainAspectRatio = menuItem.Checked;
             }
+        }
+
+        private void aboutMenuItem_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("Quarm Character UI Profile Editor\n\nA tool for editing EQ UI layouts",
+                            "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void exitMenuItem_Click(object sender, EventArgs e)
+        {
+            Close();
         }
     }
 }
