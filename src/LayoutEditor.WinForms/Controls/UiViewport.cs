@@ -14,6 +14,7 @@ namespace LayoutEditor.WinForms.Controls
         private float _scaleFactor = 1.0f;
         private bool _maintainAspectRatio = true;
         private Point _dragStartPoint;
+        private Point _currentMousePosition = Point.Empty; // Add field to track current mouse position
         private UiWindowBase _selectedWindow;
         private bool _isDragging;
         private ResizeHandle _activeResizeHandle;
@@ -269,11 +270,25 @@ namespace LayoutEditor.WinForms.Controls
                 }
             }
             
-            // Draw resolution info
+            // Draw resolution info with mouse position
             using (var brush = new SolidBrush(Color.White))
             using (var font = new Font("Segoe UI", 9f))
             {
-                string resInfo = $"Resolution: {_targetResolution.Width}x{_targetResolution.Height} - Scale: {_scaleFactor:F2}x";
+                // Calculate mouse position in target resolution coordinates
+                Point mouseInTarget = Point.Empty;
+                if (_currentMousePosition != Point.Empty && 
+                    _currentMousePosition.X >= offsetX && 
+                    _currentMousePosition.X < offsetX + viewportWidth &&
+                    _currentMousePosition.Y >= offsetY && 
+                    _currentMousePosition.Y < offsetY + viewportHeight)
+                {
+                    mouseInTarget = new Point(
+                        (int)((_currentMousePosition.X - offsetX) / _scaleFactor),
+                        (int)((_currentMousePosition.Y - offsetY) / _scaleFactor)
+                    );
+                }
+                
+                string resInfo = $"Resolution: {_targetResolution.Width}x{_targetResolution.Height} - Scale: {_scaleFactor:F2}x - Mouse: {mouseInTarget.X},{mouseInTarget.Y}";
                 g.DrawString(resInfo, font, brush, 10, ClientSize.Height - 25);
             }
         }
@@ -409,6 +424,8 @@ namespace LayoutEditor.WinForms.Controls
         
         private void UiViewport_MouseMove(object sender, MouseEventArgs e)
         {
+            _currentMousePosition = e.Location; // Update current mouse position
+            
             if (_isDragging && _selectedWindow != null)
             {
                 // Calculate viewport offset
@@ -514,8 +531,8 @@ namespace LayoutEditor.WinForms.Controls
                 }
                 
                 _dragStartPoint = e.Location;
-                Invalidate();
             }
+            Invalidate();
         }
         
         private void UiViewport_MouseUp(object sender, MouseEventArgs e)
