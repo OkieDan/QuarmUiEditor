@@ -16,6 +16,7 @@ namespace LayoutEditor.WinForms
     {
         // Keep only business logic fields in MainForm.cs, not UI controls
         private CharacterUiProfile? _profile;
+        private bool _loatLastFileOnStartup;
         private readonly List<string> _recentFiles = new();
         private readonly int _maxRecentFiles = 10;
         private readonly Dictionary<string, Size> _commonResolutions = new()
@@ -34,20 +35,20 @@ namespace LayoutEditor.WinForms
         {
             InitializeComponent();
 
-            // Setup everything after the InitializeComponent call
-            SetupEventHandlers();
             PopulateResolutions();
-            LoadRecentFiles();
+            LoadSettings();
             UpdateRecentFilesMenu();
-            propertyPanel.Controls.Add(_propertyGrid);
-            contentPanel.Controls.Add(MainSplitter);
-
+            AutoLoadLastFile();
             // Add Load event handler to handle layout after form is fully initialized
             this.Load += MainForm_Load;
         }
 
-        private void SetupEventHandlers()
+        private void AutoLoadLastFile()
         {
+            if (!loadLastFileOnStartupToolStripMenuItem.Checked)
+                return;
+            if (_recentFiles.Count > 0 && File.Exists(_recentFiles[0]))
+                OpenProfileFile(_recentFiles[0]);
         }
 
         private void PopulateResolutions()
@@ -68,19 +69,18 @@ namespace LayoutEditor.WinForms
 
         #region Recent Files Management
 
-        private void LoadRecentFiles()
+        private void LoadSettings()
         {
             _recentFiles.Clear();
 
             try
             {
                 var settings = Properties.Settings.Default;
-                var recentFilesCollection = settings.RecentFiles;
-
+                loadLastFileOnStartupToolStripMenuItem.Checked = settings.LoadLastFileOnStartup;
                 // If we have saved recent files, add them to our list
-                if (recentFilesCollection != null)
+                if (settings.RecentFiles != null)
                 {
-                    foreach (string filePath in recentFilesCollection)
+                    foreach (string filePath in settings.RecentFiles)
                     {
                         if (!string.IsNullOrEmpty(filePath))
                         {
@@ -96,7 +96,7 @@ namespace LayoutEditor.WinForms
             }
         }
 
-        private void SaveRecentFiles()
+        private void SaveSettings()
         {
             try
             {
@@ -113,6 +113,7 @@ namespace LayoutEditor.WinForms
 
                 // Save to settings
                 settings.RecentFiles = recentFilesCollection;
+                settings.LoadLastFileOnStartup = loadLastFileOnStartupToolStripMenuItem.Checked;
                 settings.Save();
             }
             catch (Exception ex)
@@ -138,7 +139,7 @@ namespace LayoutEditor.WinForms
 
             // Update menu and save
             UpdateRecentFilesMenu();
-            SaveRecentFiles();
+            SaveSettings();
         }
 
         private void UpdateRecentFilesMenu()
@@ -190,7 +191,7 @@ namespace LayoutEditor.WinForms
             {
                 _recentFiles.Remove(filePath);
                 UpdateRecentFilesMenu();
-                SaveRecentFiles();
+                SaveSettings();
 
                 MessageBox.Show(
                     $"The file '{Path.GetFileName(filePath)}' no longer exists and has been removed from the recent files list.",
@@ -204,7 +205,7 @@ namespace LayoutEditor.WinForms
         {
             _recentFiles.Clear();
             UpdateRecentFilesMenu();
-            SaveRecentFiles();
+            SaveSettings();
         }
 
         #endregion
@@ -228,7 +229,7 @@ namespace LayoutEditor.WinForms
         {
             using var openFileDialog = new OpenFileDialog
             {
-                Filter = "INI Files|*.ini;*.proj.ini|All Files|*.*",
+                Filter = "UI INI Files|UI_*.proj.ini|All Files|*.*",
                 Title = "Open EverQuest UI Profile"
             };
 
@@ -242,18 +243,24 @@ namespace LayoutEditor.WinForms
         {
             try
             {
+                WarnIfNotQuarmIni(filePath);
                 Cursor = Cursors.WaitCursor;
                 _profile = CharacterUiProfile.LoadFromFile(filePath);
 
                 if (UiViewport != null)
                 {
                     UiViewport.Profile = _profile;
+                    UiViewport.LoadedFilePath = filePath;
                 }
 
                 Text = $"Quarm Character UI Profile Editor - {Path.GetFileName(filePath)}";
 
                 // Add to recent files list
                 AddToRecentFiles(filePath);
+            }
+            catch (OperationCanceledException)
+            {
+                // User canceled loading non-standard file, do nothing
             }
             catch (Exception ex)
             {
@@ -266,6 +273,23 @@ namespace LayoutEditor.WinForms
             }
         }
 
+        private void WarnIfNotQuarmIni(string filePath)
+        {
+            var fileName = Path.GetFileName(filePath);
+            if (!fileName.StartsWith("UI_") || !fileName.EndsWith("_pq.proj.ini"))
+            {
+                var result = MessageBox.Show(
+                    "The selected file was not created for EQ client version used by Project Quarm or is not a UI settings file.\n\nSaving any changes to this file may corrupt the file! \n\nProceed with loading file?",
+                    "Warning",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+                if (result == DialogResult.No)
+                {
+                    throw new OperationCanceledException("User canceled loading non-standard file.");
+                }
+            }
+        }
+
         private void SaveProfile_Click(object? sender, EventArgs e)
         {
             if (_profile == null)
@@ -275,8 +299,37 @@ namespace LayoutEditor.WinForms
                 return;
             }
 
-            // For now, we'll just use Save As functionality
-            SaveProfileAs_Click(sender, e);
+            //SaveProfileAs_Click(sender, e);
+            SaveLoadedProfile();
+        }
+
+        private void SaveLoadedProfile()
+        {
+            try
+            {
+                var filePath = UiViewport?.LoadedFilePath;
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    SaveProfileAs_Click(this, new EventArgs());
+                }
+                else
+                {
+                    Cursor = Cursors.WaitCursor;
+                    _profile?.SaveToFile(filePath);
+                    Text = $"Quarm Character UI Profile Editor - {Path.GetFileName(filePath)}";
+                    // Add to recent files list
+                    AddToRecentFiles(filePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error saving profile: {ex.Message}", "Error",
+                               MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                Cursor = Cursors.Default;
+            }
         }
 
         private void SaveProfileAs_Click(object? sender, EventArgs e)
@@ -346,6 +399,104 @@ namespace LayoutEditor.WinForms
         private void exitMenuItem_Click(object sender, EventArgs e)
         {
             Close();
+        }
+
+        private void loadLastFileOnStartupToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            _loatLastFileOnStartup = !_loatLastFileOnStartup;
+        }
+
+        private void copyProfileToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+
+                var thisCharacter = GetLoadedProfileCharacterName();
+                var characters = GetAllCharactersFromLoadedFilePath().Where(c => !c.Equals(thisCharacter)).ToList();
+                var frm = new Forms.CopyProfileForm(characters);
+                if (frm.ShowDialog() == DialogResult.OK)
+                {
+                    var selectedCharacters = frm.Characters;
+                    if (selectedCharacters.Count == 0)
+                    {
+                        MessageBox.Show("No characters selected.", "Info",
+                                       MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+                    if (_profile == null)
+                    {
+                        MessageBox.Show("No profile is loaded.", "Error",
+                                       MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                    try
+                    {
+                        Cursor = Cursors.WaitCursor;
+                        foreach (var character in selectedCharacters)
+                        {
+                            var filePath = UiViewport?.LoadedFilePath;
+                            if (string.IsNullOrEmpty(filePath))
+                                continue;
+                            var directory = Path.GetDirectoryName(filePath);
+                            if (directory == null || !Directory.Exists(directory))
+                                continue;
+                            var newFilePath = Path.Combine(directory, $"UI_{character}_pq.proj.ini");
+                            _profile.SaveToFile(newFilePath);
+                        }
+                        MessageBox.Show($"Profile copied to {selectedCharacters.Count} characters.", "Success",
+                                       MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error copying profile: {ex.Message}", "Error",
+                                       MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    finally
+                    {
+                        Cursor = Cursors.Default;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Error",
+                               MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private string GetLoadedProfileCharacterName()
+        {
+            try
+            {
+                return Path.GetFileName(UiViewport?.LoadedFilePath)?.Replace("UI_", "").Replace("_pq.proj.ini", "");
+            }
+            catch
+            {
+                throw new InvalidOperationException("No profile is loaded.");
+            }
+        }
+        private List<string> GetAllCharactersFromLoadedFilePath()
+        {
+            var filePath = UiViewport?.LoadedFilePath;
+            if (string.IsNullOrEmpty(filePath))
+            {
+                MessageBox.Show("No profile is loaded.", "Error",
+                               MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return new List<string>();
+            }
+            var directory = Path.GetDirectoryName(filePath);
+            if (directory == null || !Directory.Exists(directory))
+            {
+                MessageBox.Show("Profile directory does not exist.", "Error",
+                               MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return new List<string>();
+            }
+            var files = Directory.GetFiles(directory, "UI_*_pq.proj.ini");
+            return files.Select(f => Path.GetFileName(f)?.Replace("UI_", "").Replace("_pq.proj.ini", ""))
+                                  .Where(name => !string.IsNullOrEmpty(name)
+                                    && !name.Contains("'s Corpse", StringComparison.OrdinalIgnoreCase)
+                                  )
+                                  .ToList()!;
         }
     }
 }

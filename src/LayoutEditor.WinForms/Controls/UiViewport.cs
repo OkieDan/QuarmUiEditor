@@ -55,7 +55,9 @@ namespace LayoutEditor.WinForms.Controls
                 Invalidate();
             }
         }
-        
+
+        public string LoadedFilePath { get; internal set; }
+
         public UiViewport()
         {
             SetStyle(
