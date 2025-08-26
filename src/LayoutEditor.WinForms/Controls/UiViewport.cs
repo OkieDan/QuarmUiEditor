@@ -71,11 +71,16 @@ namespace LayoutEditor.WinForms.Controls
             BackColor = Color.DarkGray;
             BorderStyle = BorderStyle.FixedSingle;
             
+            // Make control focusable
+            SetStyle(ControlStyles.Selectable, true);
+            TabStop = true;
+            
             // Setup events
             Resize += UiViewport_Resize;
             MouseDown += UiViewport_MouseDown;
             MouseMove += UiViewport_MouseMove;
             MouseUp += UiViewport_MouseUp;
+            KeyDown += UiViewport_KeyDown;
         }
         
         private void UiViewport_Resize(object sender, EventArgs e)
@@ -336,6 +341,9 @@ namespace LayoutEditor.WinForms.Controls
         
         private void UiViewport_MouseDown(object sender, MouseEventArgs e)
         {
+            // Ensure control gets focus when clicked
+            Focus();
+            
             _dragStartPoint = e.Location;
             
             // Calculate viewport dimensions using same logic as in OnPaint
@@ -539,6 +547,34 @@ namespace LayoutEditor.WinForms.Controls
         {
             _isDragging = false;
             _activeResizeHandle = ResizeHandle.None;
+        }
+        
+        private void UiViewport_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Delete && _selectedWindow != null)
+            {
+                // Delete the selected window
+                if (_profile != null)
+                {
+                    // Remove window from the profile
+                    _profile.RemoveWindow(_selectedWindow.Name);
+                    
+                    // Remove from the rectangles collection
+                    _windowRectangles.Remove(_selectedWindow.Name);
+                    
+                    // Clear selection
+                    var oldSelection = _selectedWindow;
+                    _selectedWindow = null;
+                    
+                    // Notify selection changed
+                    SelectionChanged?.Invoke(this, null);
+                    
+                    // Redraw
+                    Invalidate();
+                    
+                    e.Handled = true;
+                }
+            }
         }
         
         private Rectangle GetScaledRectangle(string windowName, int offsetX, int offsetY)
