@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Windows.Forms;
 using LayoutEditor.Common;
 using LayoutEditor.Common.Windows;
@@ -9,22 +11,29 @@ namespace LayoutEditor.WinForms.Controls
 {
     public class UiViewport : Panel
     {
-        private CharacterUiProfile _profile;
+        // Make nullable with ? suffix
+        private CharacterUiProfile? _profile;
         private Size _targetResolution = new Size(2560, 1440);
         private float _scaleFactor = 1.0f;
         private bool _maintainAspectRatio = true;
         private Point _dragStartPoint;
-        private Point _currentMousePosition = Point.Empty; // Add field to track current mouse position
-        private UiWindowBase _selectedWindow;
+        private Point _currentMousePosition = Point.Empty;
+        private UiWindowBase? _selectedWindow; // Make nullable
         private bool _isDragging;
         private ResizeHandle _activeResizeHandle;
+        
+        // New fields for drag selection
+        private bool _isDragSelecting;
+        private Rectangle _dragSelectRect;
+        private List<UiWindowBase> _selectedWindows = new List<UiWindowBase>();
         
         // Cache for window rectangles to avoid recalculating during paint
         private Dictionary<string, Rectangle> _windowRectangles = new();
         
-        public event EventHandler<UiWindowBase> SelectionChanged;
+        // Make event nullable
+        public event EventHandler<UiWindowBase?>? SelectionChanged;
 
-        public CharacterUiProfile Profile 
+        public CharacterUiProfile? Profile 
         { 
             get => _profile;
             set
@@ -57,7 +66,8 @@ namespace LayoutEditor.WinForms.Controls
             }
         }
 
-        public string LoadedFilePath { get; internal set; }
+        // Make nullable
+        public string? LoadedFilePath { get; internal set; }
 
         public UiViewport()
         {
@@ -65,17 +75,15 @@ namespace LayoutEditor.WinForms.Controls
                 ControlStyles.AllPaintingInWmPaint | 
                 ControlStyles.OptimizedDoubleBuffer | 
                 ControlStyles.ResizeRedraw |
-                ControlStyles.UserPaint,
+                ControlStyles.UserPaint |
+                ControlStyles.Selectable,
                 true);
             
             BackColor = Color.DarkGray;
             BorderStyle = BorderStyle.FixedSingle;
-            
-            // Make control focusable
-            SetStyle(ControlStyles.Selectable, true);
             TabStop = true;
             
-            // Setup events
+            // Setup events - fix method signatures later
             Resize += UiViewport_Resize;
             MouseDown += UiViewport_MouseDown;
             MouseMove += UiViewport_MouseMove;
@@ -83,7 +91,8 @@ namespace LayoutEditor.WinForms.Controls
             KeyDown += UiViewport_KeyDown;
         }
         
-        private void UiViewport_Resize(object sender, EventArgs e)
+        // Fix event handler signature with nullable
+        private void UiViewport_Resize(object? sender, EventArgs e)
         {
             RecalculateWindowRectangles();
             Invalidate();
@@ -159,16 +168,9 @@ namespace LayoutEditor.WinForms.Controls
                     viewportHeight = availableHeight;
                     viewportWidth = (int)(availableHeight * targetAspectRatio);
                 }
-                
-                //// Apply a small reduction to ensure there's a margin
-                //viewportWidth = (int)(viewportWidth * 0.95);
-                //viewportHeight = (int)(viewportHeight * 0.95);
             }
             else
             {
-                // Use most of the available space but leave a margin
-                //viewportWidth = (int)(availableWidth * 0.95);
-                //viewportHeight = (int)(availableHeight * 0.95);
                 viewportWidth = availableWidth;
                 viewportHeight = availableHeight;
             }
@@ -184,9 +186,6 @@ namespace LayoutEditor.WinForms.Controls
             // Center the viewport in the available space
             int offsetX = (availableWidth - viewportWidth) / 2;
             int offsetY = (availableHeight - viewportHeight) / 2;
-            
-            // Remove this line that added extra margin at the top
-            // offsetY += 10;
             
             // Ensure offsets are non-negative
             offsetX = Math.Max(0, offsetX);
@@ -234,6 +233,12 @@ namespace LayoutEditor.WinForms.Controls
                 
                 bool isSelected = _selectedWindow != null && _selectedWindow.Name == windowName;
                 
+                // Add support for multiple selection
+                if (!isSelected && _selectedWindows.Any(w => w.Name == windowName))
+                {
+                    isSelected = true;
+                }
+                
                 // Draw window rectangle
                 using (var brush = new SolidBrush(isSelected ? Color.FromArgb(100, 100, 200, 100) : Color.FromArgb(80, 100, 100, 100)))
                 {
@@ -269,9 +274,24 @@ namespace LayoutEditor.WinForms.Controls
                 }
                 
                 // Draw resize handles if selected
-                if (isSelected)
+                if (isSelected && _selectedWindow != null && _selectedWindow.Name == windowName)
                 {
                     DrawResizeHandles(g, scaledRect);
+                }
+            }
+            
+            // Draw drag selection rectangle if active
+            if (_isDragSelecting && !_dragSelectRect.IsEmpty)
+            {
+                using (var pen = new Pen(Color.White, 1))
+                {
+                    pen.DashStyle = DashStyle.Dash;
+                    g.DrawRectangle(pen, _dragSelectRect);
+                }
+                
+                using (var brush = new SolidBrush(Color.FromArgb(30, 120, 180, 240)))
+                {
+                    g.FillRectangle(brush, _dragSelectRect);
                 }
             }
             
@@ -339,7 +359,8 @@ namespace LayoutEditor.WinForms.Controls
             }
         }
         
-        private void UiViewport_MouseDown(object sender, MouseEventArgs e)
+        // Fix event handler signature
+        private void UiViewport_MouseDown(object? sender, MouseEventArgs e)
         {
             // Ensure control gets focus when clicked
             Focus();
@@ -382,7 +403,7 @@ namespace LayoutEditor.WinForms.Controls
             offsetY = Math.Max(0, offsetY);
             
             // Save previous selection
-            var previousSelection = _selectedWindow;
+            var prevSelection = _selectedWindow;
             
             // Check for resize handle first
             if (_selectedWindow != null)
@@ -398,7 +419,9 @@ namespace LayoutEditor.WinForms.Controls
             }
             
             // Check for window selection
-            _selectedWindow = null;
+            bool hitWindow = false;
+            UiWindowBase? newSelection = null; // Make nullable
+            
             foreach (var kvp in _windowRectangles)
             {
                 Rectangle rect = kvp.Value;
@@ -413,26 +436,78 @@ namespace LayoutEditor.WinForms.Controls
                 
                 if (scaledRect.Contains(e.Location))
                 {
+                    hitWindow = true;
                     if (_profile?.TryGetWindow<StandardWindow>(kvp.Key, out var window) == true)
                     {
-                        _selectedWindow = window;
-                        _isDragging = true;
-                        Invalidate();
+                        newSelection = window;
+                        
+                        // Handle multi-select with Ctrl key
+                        if (ModifierKeys.HasFlag(Keys.Control))
+                        {
+                            // Toggle selection state
+                            if (_selectedWindows.Any(w => w.Name == window.Name))
+                            {
+                                _selectedWindows.RemoveAll(w => w.Name == window.Name);
+                            }
+                            else
+                            {
+                                _selectedWindows.Add(window);
+                            }
+                            
+                            // Don't start dragging immediately with Ctrl
+                            _isDragging = false;
+                        }
+                        else
+                        {
+                            // If not using Ctrl, clear other selections
+                            if (!_selectedWindows.Any(w => w.Name == window.Name))
+                            {
+                                _selectedWindows.Clear();
+                                _selectedWindows.Add(window);
+                            }
+                            
+                            _isDragging = true;
+                        }
+                        
                         break;
                     }
                 }
             }
             
-            // Raise event if selection changed
-            if (_selectedWindow != previousSelection)
+            // If we hit a window, update the selection
+            if (hitWindow)
             {
-                SelectionChanged?.Invoke(this, _selectedWindow);
+                _selectedWindow = newSelection;
+                
+                // Raise event if selection changed
+                if (_selectedWindow != prevSelection)
+                {
+                    SelectionChanged?.Invoke(this, _selectedWindow);
+                }
             }
+            else
+            {
+                // If we didn't hit a window, start drag selection
+                if (!ModifierKeys.HasFlag(Keys.Control))
+                {
+                    _selectedWindows.Clear();
+                }
+                
+                _selectedWindow = null; // Now nullable, no error
+                _isDragSelecting = true;
+                _dragSelectRect = new Rectangle(e.Location, new Size(0, 0));
+                
+                // Raise event for cleared selection
+                SelectionChanged?.Invoke(this, null); // Now using nullable event
+            }
+            
+            Invalidate();
         }
         
-        private void UiViewport_MouseMove(object sender, MouseEventArgs e)
+        // Fix event handler signature
+        private void UiViewport_MouseMove(object? sender, MouseEventArgs e)
         {
-            _currentMousePosition = e.Location; // Update current mouse position
+            _currentMousePosition = e.Location;
             
             if (_isDragging && _selectedWindow != null)
             {
@@ -540,39 +615,118 @@ namespace LayoutEditor.WinForms.Controls
                 
                 _dragStartPoint = e.Location;
             }
+            else if (_isDragSelecting)
+            {
+                // Update the drag selection rectangle
+                int x = Math.Min(_dragStartPoint.X, e.X);
+                int y = Math.Min(_dragStartPoint.Y, e.Y);
+                int width = Math.Abs(e.X - _dragStartPoint.X);
+                int height = Math.Abs(e.Y - _dragStartPoint.Y);
+                
+                _dragSelectRect = new Rectangle(x, y, width, height);
+            }
+            
             Invalidate();
         }
         
-        private void UiViewport_MouseUp(object sender, MouseEventArgs e)
+        // Fix event handler signature
+        private void UiViewport_MouseUp(object? sender, MouseEventArgs e)
         {
+            if (_isDragSelecting)
+            {
+                // Calculate viewport offset for coordinate conversion
+                int viewportWidth = (int)(_targetResolution.Width * _scaleFactor);
+                int viewportHeight = (int)(_targetResolution.Height * _scaleFactor);
+                int offsetX = (Width - viewportWidth) / 2;
+                int offsetY = (Height - viewportHeight) / 2;
+                
+                // Find all windows that intersect with the selection rectangle
+                foreach (var kvp in _windowRectangles)
+                {
+                    Rectangle rect = kvp.Value;
+                    
+                    // Scale and offset the rectangle
+                    Rectangle scaledRect = new Rectangle(
+                        offsetX + (int)(rect.X * _scaleFactor),
+                        offsetY + (int)(rect.Y * _scaleFactor),
+                        Math.Max(1, (int)(rect.Width * _scaleFactor)),
+                        Math.Max(1, (int)(rect.Height * _scaleFactor))
+                    );
+                    
+                    if (scaledRect.IntersectsWith(_dragSelectRect))
+                    {
+                        if (_profile?.TryGetWindow<UiWindowBase>(kvp.Key, out var window) == true)
+                        {
+                            if (!_selectedWindows.Any(w => w.Name == window.Name))
+                            {
+                                _selectedWindows.Add(window);
+                                
+                                // Set first selected window as the main selection
+                                if (_selectedWindow == null)
+                                {
+                                    _selectedWindow = window;
+                                    SelectionChanged?.Invoke(this, _selectedWindow);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
             _isDragging = false;
+            _isDragSelecting = false;
             _activeResizeHandle = ResizeHandle.None;
+            _dragSelectRect = Rectangle.Empty;
+            
+            Invalidate();
         }
         
-        private void UiViewport_KeyDown(object sender, KeyEventArgs e)
+        // Fix event handler signature
+        private void UiViewport_KeyDown(object? sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Delete && _selectedWindow != null)
+            if (e.KeyCode == Keys.Delete)
             {
-                // Delete the selected window
                 if (_profile != null)
                 {
-                    // Remove window from the profile
-                    _profile.RemoveWindow(_selectedWindow.Name);
+                    bool needRedraw = false;
                     
-                    // Remove from the rectangles collection
-                    _windowRectangles.Remove(_selectedWindow.Name);
+                    // Handle single selection
+                    if (_selectedWindow != null)
+                    {
+                        // Remove window from the profile
+                        _profile.RemoveWindow(_selectedWindow.Name);
+                        
+                        // Remove from the rectangles collection
+                        _windowRectangles.Remove(_selectedWindow.Name);
+                        
+                        needRedraw = true;
+                    }
                     
-                    // Clear selection
-                    var oldSelection = _selectedWindow;
-                    _selectedWindow = null;
+                    // Handle multi-selection
+                    foreach (var window in _selectedWindows.ToList())
+                    {
+                        if (window != _selectedWindow) // Skip the main selection as it's already handled
+                        {
+                            _profile.RemoveWindow(window.Name);
+                            _windowRectangles.Remove(window.Name);
+                            needRedraw = true;
+                        }
+                    }
                     
-                    // Notify selection changed
-                    SelectionChanged?.Invoke(this, null);
-                    
-                    // Redraw
-                    Invalidate();
-                    
-                    e.Handled = true;
+                    if (needRedraw)
+                    {
+                        // Clear selection
+                        _selectedWindow = null; // Now nullable, no error
+                        _selectedWindows.Clear();
+                        
+                        // Notify selection changed
+                        SelectionChanged?.Invoke(this, null); // Now nullable, no error
+                        
+                        // Redraw
+                        Invalidate();
+                        
+                        e.Handled = true;
+                    }
                 }
             }
         }
