@@ -39,6 +39,7 @@ namespace LayoutEditor.WinForms
             openMenuItem = new ToolStripMenuItem();
             saveMenuItem = new ToolStripMenuItem();
             saveAsMenuItem = new ToolStripMenuItem();
+            copyProfileToolStripMenuItem = new ToolStripMenuItem();
             toolStripSeparator1 = new ToolStripSeparator();
             _recentFilesMenuItem = new ToolStripMenuItem();
             toolStripSeparator2 = new ToolStripSeparator();
@@ -55,21 +56,11 @@ namespace LayoutEditor.WinForms
             windowPropertiesLabel = new ToolStripLabel();
             statusBar = new StatusStrip();
             _statusLabel = new ToolStripStatusLabel();
-            contentPanel = new Panel();
-            MainSplitter = new SplitContainer();
-            UiViewport = new UiViewport();
-            propertyPanel = new Panel();
-            _propertyGrid = new PropertyGrid();
-            copyProfileToolStripMenuItem = new ToolStripMenuItem();
+            dockPanel1 = new WeifenLuo.WinFormsUI.Docking.DockPanel();
+            vS2015DarkTheme1 = new WeifenLuo.WinFormsUI.Docking.VS2015DarkTheme();
             mainMenu.SuspendLayout();
             toolbar.SuspendLayout();
             statusBar.SuspendLayout();
-            contentPanel.SuspendLayout();
-            ((ISupportInitialize)MainSplitter).BeginInit();
-            MainSplitter.Panel1.SuspendLayout();
-            MainSplitter.Panel2.SuspendLayout();
-            MainSplitter.SuspendLayout();
-            propertyPanel.SuspendLayout();
             SuspendLayout();
             // 
             // mainMenu
@@ -92,7 +83,7 @@ namespace LayoutEditor.WinForms
             // 
             openMenuItem.Name = "openMenuItem";
             openMenuItem.ShortcutKeys = Keys.Control | Keys.O;
-            openMenuItem.Size = new Size(180, 22);
+            openMenuItem.Size = new Size(155, 22);
             openMenuItem.Text = "&Open...";
             openMenuItem.Click += OpenProfile_Click;
             // 
@@ -100,38 +91,45 @@ namespace LayoutEditor.WinForms
             // 
             saveMenuItem.Name = "saveMenuItem";
             saveMenuItem.ShortcutKeys = Keys.Control | Keys.S;
-            saveMenuItem.Size = new Size(180, 22);
+            saveMenuItem.Size = new Size(155, 22);
             saveMenuItem.Text = "&Save";
             saveMenuItem.Click += SaveProfile_Click;
             // 
             // saveAsMenuItem
             // 
             saveAsMenuItem.Name = "saveAsMenuItem";
-            saveAsMenuItem.Size = new Size(180, 22);
+            saveAsMenuItem.Size = new Size(155, 22);
             saveAsMenuItem.Text = "Save &As...";
             saveAsMenuItem.Click += SaveProfileAs_Click;
+            // 
+            // copyProfileToolStripMenuItem
+            // 
+            copyProfileToolStripMenuItem.Name = "copyProfileToolStripMenuItem";
+            copyProfileToolStripMenuItem.Size = new Size(155, 22);
+            copyProfileToolStripMenuItem.Text = "&Copy Profile";
+            copyProfileToolStripMenuItem.Click += copyProfileToolStripMenuItem_Click;
             // 
             // toolStripSeparator1
             // 
             toolStripSeparator1.Name = "toolStripSeparator1";
-            toolStripSeparator1.Size = new Size(177, 6);
+            toolStripSeparator1.Size = new Size(152, 6);
             // 
             // _recentFilesMenuItem
             // 
             _recentFilesMenuItem.Name = "_recentFilesMenuItem";
-            _recentFilesMenuItem.Size = new Size(180, 22);
+            _recentFilesMenuItem.Size = new Size(155, 22);
             _recentFilesMenuItem.Text = "Recent &Files";
             // 
             // toolStripSeparator2
             // 
             toolStripSeparator2.Name = "toolStripSeparator2";
-            toolStripSeparator2.Size = new Size(177, 6);
+            toolStripSeparator2.Size = new Size(152, 6);
             // 
             // exitMenuItem
             // 
             exitMenuItem.Name = "exitMenuItem";
             exitMenuItem.ShortcutKeys = Keys.Alt | Keys.F4;
-            exitMenuItem.Size = new Size(180, 22);
+            exitMenuItem.Size = new Size(155, 22);
             exitMenuItem.Text = "E&xit";
             exitMenuItem.Click += exitMenuItem_Click;
             // 
@@ -224,81 +222,29 @@ namespace LayoutEditor.WinForms
             _statusLabel.Size = new Size(39, 17);
             _statusLabel.Text = "Ready";
             // 
-            // contentPanel
+            // dockPanel1
             // 
-            contentPanel.Controls.Add(MainSplitter);
-            contentPanel.Dock = DockStyle.Fill;
-            contentPanel.Location = new Point(0, 49);
-            contentPanel.Name = "contentPanel";
-            contentPanel.Size = new Size(1029, 559);
-            contentPanel.TabIndex = 3;
-            // 
-            // MainSplitter
-            // 
-            MainSplitter.Dock = DockStyle.Fill;
-            MainSplitter.FixedPanel = FixedPanel.Panel2;
-            MainSplitter.Location = new Point(0, 0);
-            MainSplitter.Name = "MainSplitter";
-            // 
-            // MainSplitter.Panel1
-            // 
-            MainSplitter.Panel1.Controls.Add(UiViewport);
-            // 
-            // MainSplitter.Panel2
-            // 
-            MainSplitter.Panel2.Controls.Add(propertyPanel);
-            MainSplitter.Size = new Size(1029, 559);
-            MainSplitter.SplitterDistance = 767;
-            MainSplitter.TabIndex = 0;
-            // 
-            // UiViewport
-            // 
-            UiViewport.BackColor = Color.DarkGray;
-            UiViewport.BorderStyle = BorderStyle.FixedSingle;
-            UiViewport.Dock = DockStyle.Fill;
-            UiViewport.Location = new Point(0, 0);
-            UiViewport.MaintainAspectRatio = true;
-            UiViewport.Margin = new Padding(0);
-            UiViewport.Name = "UiViewport";
-            UiViewport.Profile = null;
-            UiViewport.Size = new Size(767, 559);
-            UiViewport.TabIndex = 0;
-            UiViewport.TargetResolution = new Size(2560, 1440);
-            UiViewport.SelectionChanged += Viewport_SelectionChanged;
-            // 
-            // propertyPanel
-            // 
-            propertyPanel.Controls.Add(_propertyGrid);
-            propertyPanel.Dock = DockStyle.Fill;
-            propertyPanel.Location = new Point(0, 0);
-            propertyPanel.Name = "propertyPanel";
-            propertyPanel.Padding = new Padding(5);
-            propertyPanel.Size = new Size(258, 559);
-            propertyPanel.TabIndex = 0;
-            // 
-            // _propertyGrid
-            // 
-            _propertyGrid.Dock = DockStyle.Fill;
-            _propertyGrid.Location = new Point(5, 5);
-            _propertyGrid.Name = "_propertyGrid";
-            _propertyGrid.PropertySort = PropertySort.Categorized;
-            _propertyGrid.Size = new Size(248, 549);
-            _propertyGrid.TabIndex = 0;
-            _propertyGrid.ToolbarVisible = false;
-            // 
-            // copyProfileToolStripMenuItem
-            // 
-            copyProfileToolStripMenuItem.Name = "copyProfileToolStripMenuItem";
-            copyProfileToolStripMenuItem.Size = new Size(180, 22);
-            copyProfileToolStripMenuItem.Text = "&Copy Profile";
-            copyProfileToolStripMenuItem.Click += copyProfileToolStripMenuItem_Click;
+            dockPanel1.BackColor = Color.SaddleBrown;
+            dockPanel1.Dock = DockStyle.Fill;
+            dockPanel1.DockBackColor = Color.FromArgb(45, 45, 48);
+            dockPanel1.Location = new Point(0, 49);
+            dockPanel1.DockBottomPortion = 150D;
+            dockPanel1.DockLeftPortion = 200D;
+            dockPanel1.DockRightPortion = 200D;
+            dockPanel1.DockTopPortion = 150D;
+            dockPanel1.Name = "dockPanel1";
+            dockPanel1.Padding = new Padding(6);
+            dockPanel1.ShowAutoHideContentOnHover = false;
+            dockPanel1.Size = new Size(1029, 559);
+            dockPanel1.TabIndex = 4;
+            dockPanel1.Theme = vS2015DarkTheme1;
             // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(9F, 21F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1029, 630);
-            Controls.Add(contentPanel);
+            Controls.Add(dockPanel1);
             Controls.Add(statusBar);
             Controls.Add(toolbar);
             Controls.Add(mainMenu);
@@ -314,12 +260,6 @@ namespace LayoutEditor.WinForms
             toolbar.PerformLayout();
             statusBar.ResumeLayout(false);
             statusBar.PerformLayout();
-            contentPanel.ResumeLayout(false);
-            MainSplitter.Panel1.ResumeLayout(false);
-            MainSplitter.Panel2.ResumeLayout(false);
-            ((ISupportInitialize)MainSplitter).EndInit();
-            MainSplitter.ResumeLayout(false);
-            propertyPanel.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
 
@@ -349,16 +289,11 @@ namespace LayoutEditor.WinForms
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
         private System.Windows.Forms.ToolStripLabel windowPropertiesLabel;
         private System.Windows.Forms.StatusStrip statusBar;
-        private System.Windows.Forms.Panel contentPanel;
-        private System.Windows.Forms.Panel propertyPanel;
-        
-        // Control declarations that should be kept in the Designer
-        private System.Windows.Forms.SplitContainer MainSplitter;
-        private System.Windows.Forms.PropertyGrid _propertyGrid;
         private System.Windows.Forms.ToolStripStatusLabel _statusLabel;
-        private LayoutEditor.WinForms.Controls.UiViewport UiViewport;
         private System.Windows.Forms.ToolStripMenuItem _recentFilesMenuItem;
         private ToolStripMenuItem loadLastFileOnStartupToolStripMenuItem;
         private ToolStripMenuItem copyProfileToolStripMenuItem;
+        private WeifenLuo.WinFormsUI.Docking.DockPanel dockPanel1;
+        private WeifenLuo.WinFormsUI.Docking.VS2015DarkTheme vS2015DarkTheme1;
     }
 }

@@ -1,14 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Windows.Forms;
-using System.Configuration;
-using System.Linq;
 using LayoutEditor.Common;
 using LayoutEditor.Common.Windows;
-using LayoutEditor.WinForms.Controls;
 using LayoutEditor.WinForms;
+using LayoutEditor.WinForms.Controls;
+using LayoutEditor.WinForms.Forms;
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+using WeifenLuo.WinFormsUI.ThemeVS2015;
+using WeifenLuo.WinFormsUI.Docking;
 
 namespace LayoutEditor.WinForms
 {
@@ -31,16 +34,27 @@ namespace LayoutEditor.WinForms
             { "2560x1080 (Ultrawide)", new Size(2560, 1080) }
         };
 
+        private PropertyWindow? _propertyWindow = new PropertyWindow();
+        private ViewportWindow? _viewportWindow = new ViewportWindow();
+
         public MainForm()
         {
             InitializeComponent();
 
+            InitializeDockPanel();
             PopulateResolutions();
             LoadSettings();
             UpdateRecentFilesMenu();
             AutoLoadLastFile();
             // Add Load event handler to handle layout after form is fully initialized
             this.Load += MainForm_Load;
+        }
+
+        private void InitializeDockPanel()
+        {
+            _propertyWindow?.Show(dockPanel1, DockState.DockRight);
+            _viewportWindow?.Show(dockPanel1, DockState.Document);
+            _viewportWindow!.SelectionChanged += Viewport_SelectionChanged;
         }
 
         private void AutoLoadLastFile()
@@ -212,9 +226,9 @@ namespace LayoutEditor.WinForms
 
         private void Viewport_SelectionChanged(object? sender, UiWindowBase? window)
         {
-            if (_propertyGrid != null)
+            if (_propertyWindow != null)
             {
-                _propertyGrid.SelectedObject = window;
+                _propertyWindow.SelectedObject = window;
             }
 
             if (_statusLabel != null)
@@ -247,10 +261,10 @@ namespace LayoutEditor.WinForms
                 Cursor = Cursors.WaitCursor;
                 _profile = CharacterUiProfile.LoadFromFile(filePath);
 
-                if (UiViewport != null)
+                if (_viewportWindow != null)
                 {
-                    UiViewport.Profile = _profile;
-                    UiViewport.LoadedFilePath = filePath;
+                    _viewportWindow.Profile = _profile;
+                    _viewportWindow.LoadedFilePath = filePath;
                 }
 
                 Text = $"Quarm Character UI Profile Editor - {Path.GetFileName(filePath)}";
@@ -307,7 +321,7 @@ namespace LayoutEditor.WinForms
         {
             try
             {
-                var filePath = UiViewport?.LoadedFilePath;
+                var filePath = _viewportWindow?.LoadedFilePath;
                 if (string.IsNullOrEmpty(filePath))
                 {
                     SaveProfileAs_Click(this, new EventArgs());
@@ -376,17 +390,17 @@ namespace LayoutEditor.WinForms
             var dropdown = sender as ToolStripComboBox;
             if (dropdown?.SelectedItem is string selectedResolution &&
                 _commonResolutions.TryGetValue(selectedResolution, out var size) &&
-                UiViewport != null)
+                _viewportWindow != null)
             {
-                UiViewport.TargetResolution = size;
+                _viewportWindow.TargetResolution = size;
             }
         }
 
         private void MaintainAspectRatio_Click(object? sender, EventArgs e)
         {
-            if (sender is ToolStripMenuItem menuItem && UiViewport != null)
+            if (sender is ToolStripMenuItem menuItem && _viewportWindow != null)
             {
-                UiViewport.MaintainAspectRatio = menuItem.Checked;
+                _viewportWindow.MaintainAspectRatio = menuItem.Checked;
             }
         }
 
@@ -434,7 +448,7 @@ namespace LayoutEditor.WinForms
                         Cursor = Cursors.WaitCursor;
                         foreach (var character in selectedCharacters)
                         {
-                            var filePath = UiViewport?.LoadedFilePath;
+                            var filePath = _viewportWindow?.LoadedFilePath;
                             if (string.IsNullOrEmpty(filePath))
                                 continue;
                             var directory = Path.GetDirectoryName(filePath);
@@ -468,7 +482,7 @@ namespace LayoutEditor.WinForms
         {
             try
             {
-                return Path.GetFileName(UiViewport?.LoadedFilePath)?.Replace("UI_", "").Replace("_pq.proj.ini", "");
+                return Path.GetFileName(_viewportWindow?.LoadedFilePath)?.Replace("UI_", "").Replace("_pq.proj.ini", "");
             }
             catch
             {
@@ -477,7 +491,7 @@ namespace LayoutEditor.WinForms
         }
         private List<string> GetAllCharactersFromLoadedFilePath()
         {
-            var filePath = UiViewport?.LoadedFilePath;
+            var filePath = _viewportWindow?.LoadedFilePath;
             if (string.IsNullOrEmpty(filePath))
             {
                 MessageBox.Show("No profile is loaded.", "Error",
