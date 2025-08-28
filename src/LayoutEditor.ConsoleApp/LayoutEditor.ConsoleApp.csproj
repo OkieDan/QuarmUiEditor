@@ -11,10 +11,4 @@
     <ProjectReference Include="..\LayoutEditor.Common\LayoutEditor.Common.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="UI_Ufirst_pq.proj.ini">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>
