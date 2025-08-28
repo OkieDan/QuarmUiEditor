@@ -33,5 +33,17 @@ namespace LayoutEditor.WinForms.Properties {
                 this["RecentFiles"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool LoadLastFileOnStartup {
+            get {
+                return ((bool)(this["LoadLastFileOnStartup"]));
+            }
+            set {
+                this["LoadLastFileOnStartup"] = value;
+            }
+        }
     }
 }

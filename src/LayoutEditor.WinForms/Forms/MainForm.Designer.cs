@@ -43,8 +43,9 @@ namespace LayoutEditor.WinForms
             _recentFilesMenuItem = new ToolStripMenuItem();
             toolStripSeparator2 = new ToolStripSeparator();
             exitMenuItem = new ToolStripMenuItem();
-            viewMenu = new ToolStripMenuItem();
+            optionsMenu = new ToolStripMenuItem();
             maintainAspectMenuItem = new ToolStripMenuItem();
+            loadLastFileOnStartupToolStripMenuItem = new ToolStripMenuItem();
             helpMenu = new ToolStripMenuItem();
             aboutMenuItem = new ToolStripMenuItem();
             toolbar = new ToolStrip();
@@ -59,6 +60,7 @@ namespace LayoutEditor.WinForms
             UiViewport = new UiViewport();
             propertyPanel = new Panel();
             _propertyGrid = new PropertyGrid();
+            copyProfileToolStripMenuItem = new ToolStripMenuItem();
             mainMenu.SuspendLayout();
             toolbar.SuspendLayout();
             statusBar.SuspendLayout();
@@ -72,7 +74,7 @@ namespace LayoutEditor.WinForms
             // 
             // mainMenu
             // 
-            mainMenu.Items.AddRange(new ToolStripItem[] { fileMenu, viewMenu, helpMenu });
+            mainMenu.Items.AddRange(new ToolStripItem[] { fileMenu, optionsMenu, helpMenu });
             mainMenu.Location = new Point(0, 0);
             mainMenu.Name = "mainMenu";
             mainMenu.Size = new Size(1029, 24);
@@ -81,7 +83,7 @@ namespace LayoutEditor.WinForms
             // 
             // fileMenu
             // 
-            fileMenu.DropDownItems.AddRange(new ToolStripItem[] { openMenuItem, saveMenuItem, saveAsMenuItem, toolStripSeparator1, _recentFilesMenuItem, toolStripSeparator2, exitMenuItem });
+            fileMenu.DropDownItems.AddRange(new ToolStripItem[] { openMenuItem, saveMenuItem, saveAsMenuItem, copyProfileToolStripMenuItem, toolStripSeparator1, _recentFilesMenuItem, toolStripSeparator2, exitMenuItem });
             fileMenu.Name = "fileMenu";
             fileMenu.Size = new Size(37, 20);
             fileMenu.Text = "&File";
@@ -90,7 +92,7 @@ namespace LayoutEditor.WinForms
             // 
             openMenuItem.Name = "openMenuItem";
             openMenuItem.ShortcutKeys = Keys.Control | Keys.O;
-            openMenuItem.Size = new Size(155, 22);
+            openMenuItem.Size = new Size(180, 22);
             openMenuItem.Text = "&Open...";
             openMenuItem.Click += OpenProfile_Click;
             // 
@@ -98,32 +100,32 @@ namespace LayoutEditor.WinForms
             // 
             saveMenuItem.Name = "saveMenuItem";
             saveMenuItem.ShortcutKeys = Keys.Control | Keys.S;
-            saveMenuItem.Size = new Size(155, 22);
+            saveMenuItem.Size = new Size(180, 22);
             saveMenuItem.Text = "&Save";
             saveMenuItem.Click += SaveProfile_Click;
             // 
             // saveAsMenuItem
             // 
             saveAsMenuItem.Name = "saveAsMenuItem";
-            saveAsMenuItem.Size = new Size(155, 22);
+            saveAsMenuItem.Size = new Size(180, 22);
             saveAsMenuItem.Text = "Save &As...";
             saveAsMenuItem.Click += SaveProfileAs_Click;
             // 
             // toolStripSeparator1
             // 
             toolStripSeparator1.Name = "toolStripSeparator1";
-            toolStripSeparator1.Size = new Size(152, 6);
+            toolStripSeparator1.Size = new Size(177, 6);
             // 
             // _recentFilesMenuItem
             // 
             _recentFilesMenuItem.Name = "_recentFilesMenuItem";
-            _recentFilesMenuItem.Size = new Size(155, 22);
+            _recentFilesMenuItem.Size = new Size(180, 22);
             _recentFilesMenuItem.Text = "Recent &Files";
             // 
             // toolStripSeparator2
             // 
             toolStripSeparator2.Name = "toolStripSeparator2";
-            toolStripSeparator2.Size = new Size(152, 6);
+            toolStripSeparator2.Size = new Size(177, 6);
             // 
             // exitMenuItem
             // 
@@ -133,12 +135,12 @@ namespace LayoutEditor.WinForms
             exitMenuItem.Text = "E&xit";
             exitMenuItem.Click += exitMenuItem_Click;
             // 
-            // viewMenu
+            // optionsMenu
             // 
-            viewMenu.DropDownItems.AddRange(new ToolStripItem[] { maintainAspectMenuItem });
-            viewMenu.Name = "viewMenu";
-            viewMenu.Size = new Size(44, 20);
-            viewMenu.Text = "&View";
+            optionsMenu.DropDownItems.AddRange(new ToolStripItem[] { maintainAspectMenuItem, loadLastFileOnStartupToolStripMenuItem });
+            optionsMenu.Name = "optionsMenu";
+            optionsMenu.Size = new Size(61, 20);
+            optionsMenu.Text = "&Options";
             // 
             // maintainAspectMenuItem
             // 
@@ -146,9 +148,19 @@ namespace LayoutEditor.WinForms
             maintainAspectMenuItem.CheckOnClick = true;
             maintainAspectMenuItem.CheckState = CheckState.Checked;
             maintainAspectMenuItem.Name = "maintainAspectMenuItem";
-            maintainAspectMenuItem.Size = new Size(190, 22);
+            maintainAspectMenuItem.Size = new Size(203, 22);
             maintainAspectMenuItem.Text = "&Maintain Aspect Ratio";
             maintainAspectMenuItem.Click += MaintainAspectRatio_Click;
+            // 
+            // loadLastFileOnStartupToolStripMenuItem
+            // 
+            loadLastFileOnStartupToolStripMenuItem.Checked = true;
+            loadLastFileOnStartupToolStripMenuItem.CheckOnClick = true;
+            loadLastFileOnStartupToolStripMenuItem.CheckState = CheckState.Checked;
+            loadLastFileOnStartupToolStripMenuItem.Name = "loadLastFileOnStartupToolStripMenuItem";
+            loadLastFileOnStartupToolStripMenuItem.Size = new Size(203, 22);
+            loadLastFileOnStartupToolStripMenuItem.Text = "&Load Last File on Startup";
+            loadLastFileOnStartupToolStripMenuItem.Click += loadLastFileOnStartupToolStripMenuItem_Click;
             // 
             // helpMenu
             // 
@@ -160,7 +172,7 @@ namespace LayoutEditor.WinForms
             // aboutMenuItem
             // 
             aboutMenuItem.Name = "aboutMenuItem";
-            aboutMenuItem.Size = new Size(180, 22);
+            aboutMenuItem.Size = new Size(107, 22);
             aboutMenuItem.Text = "&About";
             aboutMenuItem.Click += aboutMenuItem_Click;
             // 
@@ -274,6 +286,13 @@ namespace LayoutEditor.WinForms
             _propertyGrid.TabIndex = 0;
             _propertyGrid.ToolbarVisible = false;
             // 
+            // copyProfileToolStripMenuItem
+            // 
+            copyProfileToolStripMenuItem.Name = "copyProfileToolStripMenuItem";
+            copyProfileToolStripMenuItem.Size = new Size(180, 22);
+            copyProfileToolStripMenuItem.Text = "&Copy Profile";
+            copyProfileToolStripMenuItem.Click += copyProfileToolStripMenuItem_Click;
+            // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(9F, 21F);
@@ -320,7 +339,7 @@ namespace LayoutEditor.WinForms
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
         private System.Windows.Forms.ToolStripMenuItem exitMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem viewMenu;
+        private System.Windows.Forms.ToolStripMenuItem optionsMenu;
         private System.Windows.Forms.ToolStripMenuItem maintainAspectMenuItem;
         private System.Windows.Forms.ToolStripMenuItem helpMenu;
         private System.Windows.Forms.ToolStripMenuItem aboutMenuItem;
@@ -339,5 +358,7 @@ namespace LayoutEditor.WinForms
         private System.Windows.Forms.ToolStripStatusLabel _statusLabel;
         private LayoutEditor.WinForms.Controls.UiViewport UiViewport;
         private System.Windows.Forms.ToolStripMenuItem _recentFilesMenuItem;
+        private ToolStripMenuItem loadLastFileOnStartupToolStripMenuItem;
+        private ToolStripMenuItem copyProfileToolStripMenuItem;
     }
 }

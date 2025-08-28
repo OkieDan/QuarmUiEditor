@@ -176,5 +176,14 @@ namespace LayoutEditor.Common
             string content = ToIniString();
             File.WriteAllText(filePath, content);
         }
+
+        public void RemoveWindow(string name)
+        {
+            if (_windows.ContainsKey(name))
+            {
+                _windows.Remove(name);
+                _sectionOrder.Remove(name);
+            }
+        }
     }
 }
