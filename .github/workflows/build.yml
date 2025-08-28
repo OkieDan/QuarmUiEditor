@@ -1,4 +1,4 @@
-name: Build and Test
+name: Build and Release
 
 on:
   push:
@@ -15,15 +15,41 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 8.0.x
-        
+    
+    # Generate version number (YYYY.MM.DD.run_number)
+    - name: Set version number
+      id: version
+      shell: pwsh
+      run: |
+        $version = Get-Date -Format "yyyy.MM.dd"
+        $fullVersion = "$version.${{ github.run_number }}"
+        echo "VERSION=$fullVersion" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "::set-output name=version::$fullVersion"
+    
     - name: Restore dependencies
       run: dotnet restore
-      
+    
     - name: Build
       run: dotnet build --configuration Release --no-restore
-      
+    
     - name: Test
       run: dotnet test --configuration Release --no-build --verbosity normal
-      
+    
     - name: Publish WinForms App
-      run: dotnet publish src/LayoutEditor.WinForms/LayoutEditor.WinForms.csproj -c Release -r win-x64 --self-contained false
+      run: dotnet publish src/LayoutEditor.WinForms/LayoutEditor.WinForms.csproj -c Release -r win-x64 --self-contained false -p:Version=${{ env.VERSION }}
+    
+    - name: Create ZIP file
+      run: |
+        Compress-Archive -Path src/LayoutEditor.WinForms/bin/Release/net8.0-windows/win-x64/publish/* -DestinationPath QuarmUiEditor-${{ env.VERSION }}.zip
+      shell: pwsh
+    
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: QuarmUiEditor-${{ env.VERSION }}.zip
+        name: Release ${{ env.VERSION }}
+        tag_name: v${{ env.VERSION }}
+        draft: false
+        prerelease: false
+        token: ${{ secrets.GITHUB_TOKEN }}
