@@ -4,6 +4,11 @@ on:
   push:
     branches: [ master, release/* ]
 
+# Add this permissions block
+permissions:
+  contents: write
+  packages: read
+
 jobs:
   build:
     runs-on: windows-latest
@@ -52,4 +57,3 @@ jobs:
         tag_name: v${{ env.VERSION }}
         draft: false
         prerelease: false
-        token: ${{ secrets.GITHUB_TOKEN }}
